@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sleep Cycle Calculator</title>
+<meta name="description" content="Find the best times to go to bed or wake up, based on 90-minute sleep cycles.">
+<meta name="theme-color" content="#0c1a1f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sleep">
+<style>
+/*
+VOICE: calm, quiet, bedside.
+IDEA: a bedside clock face / night sky — times read like a clock radio.
+PICTURE: the result list itself, huge hanging times, each with a strip of 90-min cycle blocks.
+COLOUR and TYPE: deep night teal ground, moonlight ink, warm coral accent for the best pick; Georgia numerals + system sans (no web fonts, so it works offline).
+LAYOUT: one calm column, mode switch on top, input, then results.
+*/
+:root{color-scheme:dark;--bg:#0c1a1f;--panel:#13262c;--line:#21414a;--ink:#e9f0ef;--mute:#9db3b3;--acc:#ff8a65;--cyc:#2d5c66;--cyc2:#3f7c88}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:radial-gradient(120% 60% at 80% -10%,#173840 0%,var(--bg) 60%) fixed,var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;overflow-x:clip;min-height:100vh}
+.wrap{max-width:640px;margin:0 auto;padding:calc(clamp(24px,5vw,56px) + env(safe-area-inset-top)) max(5vw,16px,env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) max(5vw,16px,env(safe-area-inset-left))}
+h1{font:700 clamp(32px,7vw,46px)/1.05 Georgia,'Times New Roman',serif;margin:0 0 6px;text-wrap:balance}
+.sub{color:var(--mute);margin:0 0 24px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px;margin-bottom:22px}
+.seg button{font:500 14px/1.2 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--mute);background:none;border:0;border-radius:10px;min-height:48px;padding:6px 8px;cursor:pointer}
+.seg button[aria-selected=true]{background:var(--ink);color:var(--bg);font-weight:700}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.ask{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin-bottom:8px}
+.ask label{font-weight:500;font-size:17px}
+input[type=time]{font:600 22px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 14px;min-height:48px;color-scheme:dark}
+.now{font:700 clamp(36px,9vw,52px)/1 Georgia,'Times New Roman',serif;color:var(--ink)}
+.note{color:var(--mute);font-size:14px;margin:6px 0 20px}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.item.best{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.t{font:700 clamp(34px,9vw,46px)/1 Georgia,'Times New Roman',serif;white-space:nowrap;font-variant-numeric:tabular-nums;grid-row:span 2}
+.best .t{color:var(--acc)}
+.meta{font-size:14px;color:var(--mute)}
+.meta b{color:var(--ink);font-weight:700}
+.tag{display:inline-block;font-size:12px;font-weight:700;color:var(--bg);background:var(--acc);border-radius:20px;padding:1px 9px;margin-left:6px;vertical-align:1px}
+.cyc{display:flex;gap:3px;height:10px}
+.cyc i{flex:1;border-radius:3px;background:linear-gradient(90deg,var(--cyc),var(--cyc2))}
+.cyc i.lat{flex:.17;background:var(--line)}
+details{margin-top:28px;border-top:1px solid var(--line);padding-top:16px}
+summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.set{display:grid;gap:14px;margin-top:8px}
+.set label{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+input[type=range]{width:100%;accent-color:var(--acc);height:32px}
+.how{color:var(--mute);font-size:14px;margin-top:22px}
+@media(prefers-reduced-motion:no-preference){.item{animation:up .35s ease both}.item:nth-child(2){animation-delay:.04s}.item:nth-child(3){animation-delay:.08s}.item:nth-child(4){animation-delay:.12s}.item:nth-child(5){animation-delay:.16s}@keyframes up{from{opacity:0;transform:translateY(6px)}}}
+@media(max-width:420px){.seg button{font-size:13px}.item{padding:14px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>When to sleep, when to wake</h1>
+  <p class="sub">Wake up between sleep cycles, not in the middle of one, and you'll feel less groggy.</p>
+
+  <div class="seg" role="tablist" aria-label="Mode">
+    <button role="tab" id="tab-bed" data-m="bed">I'm going to bed at…</button>
+    <button role="tab" id="tab-now" data-m="now">I'm going to bed now</button>
+    <button role="tab" id="tab-wake" data-m="wake">I need to wake up at…</button>
+  </div>
+
+  <div id="askBed" class="ask"><label for="bedIn">Bedtime</label><input type="time" id="bedIn" value="23:00"></div>
+  <div id="askNow" class="ask"><span class="now" id="nowT">--:--</span></div>
+  <div id="askWake" class="ask"><label for="wakeIn">Wake-up time</label><input type="time" id="wakeIn" value="07:00"></div>
+
+  <p class="note" id="note"></p>
+  <ul class="list" id="list" aria-live="polite"></ul>
+
+  <details>
+    <summary>Adjust settings</summary>
+    <div class="set">
+      <div><label for="lat"><span>Time to fall asleep</span><b id="latV"></b></label><input type="range" id="lat" min="0" max="45" step="5" value="15"></div>
+      <div><label for="cl"><span>Sleep cycle length</span><b id="clV"></b></label><input type="range" id="cl" min="80" max="110" step="5" value="90"></div>
+    </div>
+  </details>
+
+  <p class="how">A sleep cycle lasts about 90 minutes and most adults fall asleep in around 15. Five or six cycles (7½–9 h) is the sweet spot for most adults. Cycle length varies from person to person, so tweak the settings if you still wake up groggy.</p>
+</main>
+
+<script>
+{
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem('sleepcalc.'+k); return v === null ? d : v; } catch(e){ return d; } },
+    set(k, v){ try { localStorage.setItem('sleepcalc.'+k, v); } catch(e){} }
+  };
+  const CYCLES = [6, 5, 4, 3];
+  let mode = store.get('mode', 'bed');
+  $('bedIn').value = store.get('bed', '23:00');
+  $('wakeIn').value = store.get('wake', '07:00');
+  $('lat').value = store.get('lat', '15');
+  $('cl').value = store.get('cl', '90');
+
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = mins => { const m = ((Math.round(mins) % 1440) + 1440) % 1440; return pad(Math.floor(m/60)) + ':' + pad(m % 60); };
+  const parse = v => { const [h, m] = (v || '0:0').split(':').map(Number); return h*60 + m; };
+  const dur = mins => { const h = Math.floor(mins/60), m = mins % 60; return h + ' h' + (m ? ' ' + m + ' min' : ''); };
+  const nowMins = () => { const d = new Date(); return d.getHours()*60 + d.getMinutes() + d.getSeconds()/60; };
+
+  function render(){
+    const lat = +$('lat').value, cl = +$('cl').value;
+    $('latV').textContent = lat + ' min';
+    $('clV').textContent = cl + ' min';
+    for (const b of document.querySelectorAll('.seg button')) b.setAttribute('aria-selected', b.dataset.m === mode);
+    $('askBed').hidden = mode !== 'bed';
+    $('askNow').hidden = mode !== 'now';
+    $('askWake').hidden = mode !== 'wake';
+
+    let base, rows, note;
+    if (mode === 'wake') {
+      base = parse($('wakeIn').value);
+      rows = CYCLES.map(n => ({ n, t: base - n*cl - lat }));
+      note = `Go to bed at one of these times to wake at ${fmt(base)}. That allows ${lat} min to fall asleep.`;
+    } else {
+      base = mode === 'now' ? Math.ceil(nowMins()) : parse($('bedIn').value);
+      if (mode === 'now') $('nowT').textContent = fmt(base);
+      rows = CYCLES.map(n => ({ n, t: base + lat + n*cl }));
+      note = `Set your alarm for one of these times. That assumes you fall asleep about ${lat} min after ${mode === 'now' ? 'lying down now' : fmt(base)}.`;
+    }
+    $('note').textContent = note;
+    $('list').innerHTML = rows.map(r => {
+      const best = r.n >= 5;
+      const blocks = '<i class="lat"></i>' + '<i></i>'.repeat(r.n);
+      return `<li class="item${best ? ' best' : ''}">
+        <span class="t">${fmt(r.t)}</span>
+        <span class="meta"><b>${r.n} cycles</b> · ${dur(r.n*cl)} of sleep${r.n === 6 ? '<span class="tag">Best</span>' : r.n === 5 ? '<span class="tag">Good</span>' : ''}</span>
+        <span class="cyc" aria-hidden="true">${blocks}</span>
+      </li>`;
+    }).join('');
+  }
+
+  for (const b of document.querySelectorAll('.seg button')) b.addEventListener('click', () => { mode = b.dataset.m; store.set('mode', mode); render(); });
+  for (const id of ['bedIn', 'wakeIn', 'lat', 'cl']) $(id).addEventListener('input', () => {
+    store.set(id === 'bedIn' ? 'bed' : id === 'wakeIn' ? 'wake' : id, $(id).value); render();
+  });
+  const tick = setInterval(() => { if (mode === 'now') render(); }, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+  render();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+}
+</script>
+</body>
+</html>
